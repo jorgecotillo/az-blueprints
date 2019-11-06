@@ -1,0 +1,179 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "organization": {
+            "type": "string",
+            "metadata": {
+                "description": "Organization name. For example: Contoso"
+            }
+        },
+        "function-files": {
+            "type": "object",
+            "defaultValue": {
+                "run.csx": "#r \"Newtonsoft.Json\"\nusing System.Net;\nusing System.Net.Http;\nusing Microsoft.AspNetCore.Mvc;\nusing Microsoft.Extensions.Primitives;\nusing Newtonsoft.Json;\nusing Microsoft.Azure.Services.AppAuthentication;\nusing Microsoft.Azure.KeyVault;\nusing Newtonsoft.Json.Linq;\n\npublic class KeyResource\n{\n\tpublic KeyResource(object obj) {\n\t\tproperties = obj;\n\t}\n\tpublic object properties { get; set; }\n}\n\npublic static async Task<HttpResponseMessage> Run(HttpRequestMessage req, ILogger log)\n{\n\tstring vaultName = null;\n\tstring keyName = null;\n\tstring requestBody = req.Content.ReadAsStringAsync().Result;\n\tdynamic data = JsonConvert.DeserializeObject(requestBody);\n\tvaultName = vaultName ?? data?.properties.VaultName;\n\tkeyName = keyName ?? data?.properties.KeyName;\n\tHttpResponseMessage response = null;\n\ttry\n\t{\n\t\tvar azureServiceTokenProvider = new AzureServiceTokenProvider();\n\t\tvar kv = \n\t\t\tnew KeyVaultClient(\n\t\t\tnew KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));\n\n\t\tvar kvResponse = await kv.CreateKeyWithHttpMessagesAsync(\n\t\t\t$\"https://{vaultName}.vault.azure.net\",\n\t\t\tkeyName,\n\t\t\t\"RSA\", 2048);\n\t\tresponse = req.CreateResponse(HttpStatusCode.OK);\n\t\tresponse.Content = new StringContent(JToken.FromObject(new KeyResource(kvResponse.Body)).ToString(), System.Text.Encoding.UTF8, \"application/json\");\n\t}\n\tcatch(Exception ex) {\n\t\tlog.LogInformation($\"Exception - {ex.Message}\");\n\t\tresponse = req.CreateResponse(HttpStatusCode.OK);\n\t\tresponse.Content = new StringContent(JToken.FromObject(new KeyResource(\"Error\")).ToString(), System.Text.Encoding.UTF8, \"application/json\");\n\t}\n\n\treturn response;\n}",
+                "function.proj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>netstandard2.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Microsoft.Azure.Services.AppAuthentication\" Version=\"1.3.1\" /><PackageReference Include=\"Microsoft.Azure.KeyVault\" Version=\"3.0.4\" /></ItemGroup></Project>",
+                "host.json": "{\"version\":\"2.0\"}"
+            },
+            "metadata": {
+                "displayName": "Azure function files",
+                "description": "Azure function files and their content."
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        }
+    },
+    "variables": {
+        "site-name": "[concat(parameters('organization'),'-site-', uniqueString(resourceGroup().id, subscription().id))]",
+        "uniqueString": "[uniqueString(subscription().id, concat(parameters('organization'), 'azure-function'))]",
+        "azure-function-storageAccount-prefix": "[concat(replace(parameters('organization'), '-', ''), 'azure-function')]",
+        "azure-function-storageAccount-name": "[toLower(substring(replace(concat(variables('azure-function-storageAccount-prefix'), variables('uniqueString'), variables('uniqueString')), '-', ''), 0, 23) )]",
+        "hosting-planName": "[concat(parameters('organization'), '-customRP-hosting-plan')]",
+        "sku": "Dynamic",
+        "sku-code": "Y1",
+        "worker-size": "0",
+        "worker-sizeId": "0",
+        "number-of-workers": "1",
+        "hosting-environment": "",
+        "function-name": "createEncryptionKey"
+    },
+    "resources": [
+        {
+            "comments": "----DEPLOYMENT ARTIFACTS STORAGE ACCOUNT-----",
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('azure-function-storageAccount-name')]",
+            "apiVersion": "2018-07-01",
+            "location": "[parameters('location')]",
+            "kind": "StorageV2",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "tags": {
+                "layer": "custom RP"
+            },
+            "properties": {
+                "encryption": {
+                    "keySource": "Microsoft.Storage",
+                    "services": {
+                        "blob": {
+                            "enabled": true
+                        },
+                        "file": {
+                            "enabled": true
+                        }
+                    }
+                },
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('hosting-planName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [],
+            "sku": {
+                "Tier": "[variables('sku')]",
+                "Name": "[variables('sku-code')]"
+            },
+            "kind": "",
+            "properties": {
+                "name": "[variables('hosting-planName')]",
+                "workerSize": "[variables('worker-size')]",
+                "workerSizeId": "[variables('worker-sizeId')]",
+                "numberOfWorkers": "[variables('number-of-workers')]",
+                "hostingEnvironment": "[variables('hosting-environment')]"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "kind": "functionapp",
+            "name": "[variables('site-name')]",
+            "apiVersion": "2018-02-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[variables('azure-function-storageAccount-name')]",
+                "[variables('hosting-planName')]"
+            ],
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "name": "[variables('site-name')]",
+                "httpsOnly": true,
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "dotnet"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~2"
+                        },
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('azure-function-storageAccount-name'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('azure-function-storageAccount-name')), '2019-06-01').keys[0].value,';EndpointSuffix=','core.windows.net')]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('azure-function-storageAccount-name'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('azure-function-storageAccount-name')), '2019-06-01').keys[0].value,';EndpointSuffix=','core.windows.net')]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTSHARE",
+                            "value": "[concat(toLower(variables('function-name')), '9353')]"
+                        }
+                    ]
+                },
+                "serverFarmId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourcegroups/', resourceGroup().name, '/providers/Microsoft.Web/serverfarms/', variables('hosting-planName'))]",
+                "hostingEnvironment": "[variables('hosting-environment')]",
+                "clientAffinityEnabled": true
+            }
+        },
+        {
+            "name": "[concat(variables('site-name'), '/', variables('function-name'))]",
+            "type": "Microsoft.Web/sites/functions",
+            "apiVersion": "2018-02-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', variables('site-name'))]"
+            ],
+            "properties": {
+                "config": {
+                    "bindings": [
+                        {
+                            "authLevel": "anonymous",
+                            "name": "req",
+                            "type": "httpTrigger",
+                            "direction": "in",
+                            "methods": [
+                                "post",
+                                "put"
+                            ]
+                        },
+                        {
+                            "name": "res",
+                            "type": "http",
+                            "direction": "out"
+                        }
+                    ]
+                },
+                "files": "[parameters('function-files')]"
+            }
+        }
+    ],
+    "outputs": {
+        "principalId": {
+            "type": "string",
+            "value": "[reference(concat('Microsoft.Web/sites/', variables('site-name')), '2018-02-01', 'Full').identity.principalId]"
+        },
+        "customRPAzureFunctionEndpoint": {
+            "type": "string",
+            "value": "[reference(concat('Microsoft.Web/sites/', variables('site-name'), '/functions/', variables('function-name')), '2018-02-01', 'Full').properties.invoke_url_template]"
+        }
+    }
+}
