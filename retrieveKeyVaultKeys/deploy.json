@@ -1,0 +1,24 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "jumpboxKeyEncryptionKeyId": {
+            "type": "string"
+        },
+        "addsKeyEncryptionKeyId": {
+            "type": "string"
+        }
+    },
+    "variables": {},
+    "resources": [],
+    "outputs": {
+        "jumpboxKEK": {
+            "type": "string",
+            "value": "[reference(parameters('jumpboxKeyEncryptionKeyId'), '2018-09-01-preview').KeyIdentifier.Identifier]"
+        },
+        "addsKEK": {
+            "type": "string",
+            "value": "[reference(parameters('addsKeyEncryptionKeyId'), '2018-09-01-preview').KeyIdentifier.Identifier]"
+        }
+    }
+}
