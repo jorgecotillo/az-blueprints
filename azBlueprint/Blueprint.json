@@ -1,0 +1,40 @@
+{
+  "properties": {
+    "targetScope": "subscription",
+    "parameters": {
+      "organization": {
+        "type": "string",
+        "metadata": {
+          "displayName": "organization (Custom RP defintion)",
+          "description": "Organization name. For example: Contoso"
+        },
+        "allowedValues": []
+      },
+      "keyEncryptionKeycreation_key-vault-name": {
+        "type": "string",
+        "metadata": {
+          "displayName": "key-vault-name (Key Encryption Key creation)",
+          "description": "Key Vault Name"
+        },
+        "allowedValues": []
+      }
+    },
+    "resourceGroups": {
+      "ResourceGroup": {
+        "name": "custom-resource-provider-rg",
+        "location": "westus2",
+        "dependsOn": []
+      },
+      "ResourceGroup2": {
+        "name": "keyvault-rg",
+        "location": "westus2",
+        "dependsOn": []
+      },
+      "ResourceGroup3": {
+        "name": "jumpbox-rg",
+        "location": "westus2",
+        "dependsOn": []
+      }
+    }
+  }
+}
