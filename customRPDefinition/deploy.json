@@ -1,0 +1,54 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "customRP-function-endpoint": {
+            "type": "string",
+            "metadata": {
+                "description": "Endpoint of the azure function hosting the key encryption key creation code",
+                "displayName": "Azure function custom RP endpoint"
+            }
+        },
+        "customRP-location": {
+            "type": "string",
+            "defaultValue": "westus2",
+            "allowedValues": [
+                "australiaeast",
+                "eastus",
+                "westeurope",
+                "northeurope",
+                "westus2",
+                "australiasoutheast",
+                "canadacentral",
+                "canadaeast"
+            ],
+            "metadata": {
+                "description": "Location for custom RP."
+            }
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "apiVersion": "2018-09-01-preview",
+            "type": "Microsoft.CustomProviders/resourceProviders",
+            "name": "ecpCustomRP",
+            "location": "[parameters('customRP-location')]",
+            "properties": {
+                "resourceTypes": [
+                    {
+                        "name": "encryptionkey",
+                        "routingType": "Proxy,Cache",
+                        "endpoint": "[parameters('customRP-function-endpoint')]"
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+        "resourceGroupName": {
+            "type": "string",
+            "value": "[resourceGroup().name]"
+        }
+    }
+}

@@ -1,0 +1,98 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "organization": {
+            "type": "string",
+            "metadata": {
+                "description": "Organization name. For example: Contoso"
+            }
+        },
+        "vault-sku": {
+            "type": "string",
+            "defaultValue": "Premium",
+            "allowedValues": [
+                "Premium"
+            ],
+            "metadata": {
+                "displayName": "Key Vault SKU",
+                "description": "Specifies the SKU for the vault"
+            }
+        },
+        "encryption-managed-identity-principal-id": {
+            "type": "string",
+            "metadata": {
+                "displayName": "Encryption user managed identity id",
+                "description": "Encryption user managed identity id"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        }
+    },
+    "variables": {
+        "deployment-prefix": "[concat(parameters('organization'), '-sharedsvcs')]",
+        "enable-vault-for-deployment": true,
+        "enable-vault-for-templateDeployment": true,
+        "enable-vault-for-diskEncryption": true,
+        "key-vault-name": "[concat(variables('deployment-prefix'), '-kv')]",
+        "access-policies": [
+            {
+                "tenantId": "[subscription().tenantId]",
+                "objectId": "[parameters('encryption-managed-identity-principal-id')]",
+                "permissions": {
+                    "keys": [
+                        "All"
+                    ]
+                }
+            }
+        ]
+    },
+    "resources": [
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "name": "[variables('key-vault-name')]",
+            "apiVersion": "2016-10-01",
+            "location": "[parameters('location')]",
+            "tags": {
+                "displayName": "[variables('key-vault-name')]"
+            },
+            "properties": {
+                "enabledForDeployment": "[variables('enable-vault-for-deployment')]",
+                "enabledForTemplateDeployment": "[variables('enable-vault-for-templateDeployment')]",
+                "enabledForDiskEncryption": "[variables('enable-vault-for-diskEncryption')]",
+                "tenantId": "[subscription().tenantId]",
+                "accessPolicies": "[variables('access-policies')]",
+                "sku": {
+                    "name": "[parameters('vault-sku')]",
+                    "family": "A"
+                },
+                "networkAcls": {
+                    "defaultAction": "Allow"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "keyVaultId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.KeyVault/vaults', variables('key-vault-name'))]"
+        },
+        "keyVaultResourceGroup": {
+            "type": "string",
+            "value": "[resourceGroup().name]"
+        },
+        "keyVaultName": {
+            "type": "string",
+            "value": "[variables('key-vault-name')]"
+        },
+        "keyVaultUrl": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.KeyVault/vaults', variables('key-vault-name')),'2016-10-01').vaultUri]"
+        }
+    }
+}
