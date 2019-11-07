@@ -49,6 +49,10 @@
         "resourceGroupName": {
             "type": "string",
             "value": "[resourceGroup().name]"
+        },
+        "resourceGroupLocation": {
+            "type": "string",
+            "value": "[parameters('customRP-location')]"
         }
     }
 }

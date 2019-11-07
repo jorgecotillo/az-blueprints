@@ -8,12 +8,6 @@
       "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
       "contentVersion": "1.0.0.0",
       "parameters": {
-        "organization": {
-          "type": "string",
-          "metadata": {
-            "description": "Organization name. For example: Contoso"
-          }
-        },
         "key-vault-name": {
           "type": "string",
           "metadata": {
@@ -27,7 +21,7 @@
             "description": "Custom Resource Provider Resource Group name"
           }
         },
-        "location": {
+        "customRP-location": {
           "type": "string",
           "defaultValue": "[resourceGroup().location]",
           "metadata": {
@@ -55,7 +49,7 @@
                   "type": "Microsoft.CustomProviders/resourceProviders/encryptionkey",
                   "name": "ecpCustomRP/jumpboxKek",
                   "apiVersion": "2018-09-01-preview",
-                  "location": "[parameters('location')]",
+                  "location": "[parameters('customRP-location')]",
                   "properties": {
                     "VaultName": "[parameters('key-vault-name')]",
                     "KeyName": "JumpboxKEK"
@@ -65,7 +59,7 @@
                   "type": "Microsoft.CustomProviders/resourceProviders/encryptionkey",
                   "name": "ecpCustomRP/addsKek",
                   "apiVersion": "2018-09-01-preview",
-                  "location": "[parameters('location')]",
+                  "location": "[parameters('customRP-location')]",
                   "properties": {
                     "VaultName": "[parameters('key-vault-name')]",
                     "KeyName": "AddsKEK"
@@ -89,14 +83,14 @@
     },
     "resourceGroup": "ResourceGroup3",
     "parameters": {
-      "organization": {
-        "value": "[parameters('organization')]"
-      },
       "key-vault-name": {
-        "value": "[parameters('keyEncryptionKeycreation_key-vault-name')]"
+        "value": "[artifacts('keyVault').outputs.keyVaultName]"
       },
       "customRP-resource-group-name": {
-        "value": "custom-resource-provider-rg"
+        "value": "[artifacts('customRPDefinition').outputs.resourceGroupName]"
+      },
+      "customRP-location": {
+        "value": "[artifacts('customRPDefinition').outputs.resourceGroupLocation]"
       }
     }
   }
